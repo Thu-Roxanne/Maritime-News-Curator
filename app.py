@@ -2,7 +2,6 @@ import streamlit as st
 import feedparser
 import yaml
 import hashlib
-import json
 from datetime import datetime
 from bs4 import BeautifulSoup
 from collections import defaultdict
@@ -10,22 +9,50 @@ import math
 
 st.set_page_config(page_title="Maritime Latest News", layout="wide")
 
-# Load topics
+# --- Load topics and feeds ---
 with open("topics.yaml", "r") as f:
     topic_config = yaml.safe_load(f)
 all_topics = list(topic_config["topics"].keys())
 
-# Load feeds
 with open("feeds.yaml", "r") as f:
     feed_config = yaml.safe_load(f)
 
+# --- Utility functions ---
 def clean(text):
     return BeautifulSoup(text or "", "html.parser").get_text().strip()
 
 def article_id(title, link):
     return hashlib.sha1(f"{title}{link}".encode()).hexdigest()
 
-# Fetch articles matching selected topic
+# 🔍 Improved image extraction
+def extract_image(entry):
+    # 1. media_content
+    media = entry.get("media_content", [])
+    if media and isinstance(media, list) and media[0].get("url"):
+        return media[0]["url"]
+
+    # 2. media_thumbnail
+    if entry.get("media_thumbnail"):
+        return entry["media_thumbnail"][0].get("url", "")
+
+    # 3. from summary
+    if "summary" in entry:
+        soup = BeautifulSoup(entry["summary"], "html.parser")
+        img_tag = soup.find("img")
+        if img_tag and img_tag.get("src"):
+            return img_tag["src"]
+
+    # 4. from content block
+    if entry.get("content"):
+        html = entry["content"][0].get("value", "")
+        soup = BeautifulSoup(html, "html.parser")
+        img_tag = soup.find("img")
+        if img_tag and img_tag.get("src"):
+            return img_tag["src"]
+
+    return ""
+
+# 📰 Fetch and filter articles by topic
 def fetch_articles_for_topic(selected_topic):
     all_articles = []
     feeds = feed_config["feeds"]
@@ -47,11 +74,7 @@ def fetch_articles_for_topic(selected_topic):
                     matched_topics.append(topic)
 
             if selected_topic in matched_topics:
-                image = ""
-                media = entry.get("media_content", [])
-                if media and isinstance(media, list):
-                    image = media[0].get("url", "")
-
+                image = extract_image(entry)
                 all_articles.append({
                     "id": article_id(title, link),
                     "title": title,
@@ -63,23 +86,24 @@ def fetch_articles_for_topic(selected_topic):
                 })
     return all_articles
 
+# 🧱 Display article card
 def display_article_card(article, key_suffix):
     with st.container():
         if article.get("image"):
             st.image(article["image"], use_column_width=True)
         st.markdown(f"### {article['title']}")
-        st.markdown(f"*🗓 {article['date'][:10]}*")
-        st.markdown(f"**Topics:** {', '.join(article['topics'])}  ")
-        st.markdown(f"{article['summary'][:200]}...")
+        st.markdown(f"*📅 {article['date'][:10]}*")
+        st.markdown(f"**Topics:** {', '.join(article['topics'])}")
+        st.markdown(f"{article['summary'][:300]}...")
         st.markdown(f"[🔗 Read more]({article['link']})")
         if st.checkbox("⭐ Add to Top 10", key=f"sel_{article['id']}_{key_suffix}"):
             selected.append(article)
 
-# UI starts here
+# --- UI ---
 st.title("📰 Maritime Latest News")
 selected = []
 
-# Tile UI for topic selection
+# 🔘 Topic tiles (clickable)
 st.markdown("### 📂 Choose a topic")
 topic_cols = st.columns(3)
 
@@ -89,7 +113,7 @@ for i, topic in enumerate(all_topics):
             st.session_state["selected_topic"] = topic
             st.session_state["articles"] = fetch_articles_for_topic(topic)
 
-# Display fetched articles
+# 🧾 Article display
 articles = st.session_state.get("articles", [])
 selected_topic = st.session_state.get("selected_topic", None)
 
@@ -111,7 +135,7 @@ if articles:
 
     st.divider()
 
-# Export Top 10
+# 💾 Markdown Export
 if selected:
     st.subheader("📦 Export Top 10 as Markdown")
     markdown = f"# Maritime Top 10 – {selected_topic}\n\n"
