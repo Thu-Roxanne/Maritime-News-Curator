@@ -10,7 +10,7 @@ import math
 
 st.set_page_config(page_title="Maritime News", layout="wide")
 
-# Load topics
+# Load topic keywords
 with open("topics.yaml", "r") as f:
     topic_config = yaml.safe_load(f)
 
@@ -18,15 +18,15 @@ with open("topics.yaml", "r") as f:
 with open("feeds.yaml", "r") as f:
     feed_config = yaml.safe_load(f)
 
-# Clean HTML
+# Clean HTML content
 def clean(text):
-    return BeautifulSoup(text, "html.parser").get_text().strip()
+    return BeautifulSoup(text or "", "html.parser").get_text().strip()
 
-# Unique article ID
+# Generate unique ID from title + link
 def article_id(title, link):
     return hashlib.sha1(f"{title}{link}".encode()).hexdigest()
 
-# Fetch articles
+# Fetch articles from RSS
 def fetch_articles():
     articles = []
     feeds = feed_config["feeds"]
@@ -42,13 +42,13 @@ def fetch_articles():
             pub_date = entry.get("published", datetime.utcnow().isoformat())
             full_text = f"{title} {summary}"
 
-            # Topic tagging
+            # Detect topic(s)
             matched_topics = []
             for topic, data in topic_config["topics"].items():
                 if any(word.lower() in full_text.lower() for word in data.get("include", [])):
                     matched_topics.append(topic)
 
-            # Try to extract image
+            # Optional: try media content
             image = ""
             media = entry.get("media_content", [])
             if media and isinstance(media, list):
@@ -61,12 +61,12 @@ def fetch_articles():
                 "link": link,
                 "date": pub_date,
                 "topics": matched_topics or ["📂 Uncategorized"],
-                "image": image
+                "image": image or ""
             })
     return articles
 
-# Display single article in card format
-def display_article_card(article):
+# Display one article in Inoreader-style card
+def display_article_card(article, key_suffix):
     with st.container():
         if article.get("image"):
             st.image(article["image"], use_column_width=True)
@@ -75,17 +75,19 @@ def display_article_card(article):
         st.markdown(f"**Topics:** {', '.join(article['topics'])}  ")
         st.markdown(f"{article['summary'][:200]}...")
         st.markdown(f"[🔗 Read more]({article['link']})")
-        if st.checkbox("⭐ Add to Top 10", key=f"sel_{article['id']}"):
+        if st.checkbox("⭐ Add to Top 10", key=f"sel_{article['id']}_{key_suffix}"):
             selected.append(article)
 
-# UI START
+# --- UI Starts Here ---
 st.title("📰 Maritime News Curator")
 selected = []
 
-if st.button("Fetch News"):
+# Button to fetch news
+if st.button("📥 Fetch Latest News"):
     st.session_state["articles"] = fetch_articles()
-    st.success(f"Fetched {len(st.session_state['articles'])} articles!")
+    st.success(f"Fetched {len(st.session_state['articles'])} articles.")
 
+# Get articles from session or default to empty
 articles = st.session_state.get("articles", [])
 
 # Group by topic
@@ -94,9 +96,13 @@ for article in articles:
     for topic in article["topics"]:
         topic_buckets[topic].append(article)
 
+# Sort topics alphabetically
 sorted_topics = sorted(topic_buckets.items())
+
+# Config
 PAGE_SIZE = 20
 
+# Display per topic
 for topic, group_articles in sorted_topics:
     st.markdown(f"## 📌 {topic} ({len(group_articles)} articles)")
 
@@ -114,11 +120,10 @@ for topic, group_articles in sorted_topics:
         for j in range(3):
             if i + j < len(page_articles):
                 with cols[j]:
-                    display_article_card(page_articles[i + j])
+                    display_article_card(page_articles[i + j], key_suffix=f"{topic}_{i}_{j}")
 
+# --- Export Top 10 ---
 st.divider()
-
-# Export section
 if selected:
     st.subheader("📦 Export Top 10 as Markdown")
     markdown = "# Maritime Top 10 News of the Week\n\n"
