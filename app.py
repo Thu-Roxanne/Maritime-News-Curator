@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 from collections import defaultdict
 import math
 
-st.set_page_config(page_title="Maritime News Curator", layout="wide")
+st.set_page_config(page_title="Maritime Latest News", layout="wide")
 
 # Load topics
 with open("topics.yaml", "r") as f:
@@ -19,15 +19,13 @@ all_topics = list(topic_config["topics"].keys())
 with open("feeds.yaml", "r") as f:
     feed_config = yaml.safe_load(f)
 
-# Clean HTML
 def clean(text):
     return BeautifulSoup(text or "", "html.parser").get_text().strip()
 
-# Generate unique ID
 def article_id(title, link):
     return hashlib.sha1(f"{title}{link}".encode()).hexdigest()
 
-# Fetch and filter articles
+# Fetch articles matching selected topic
 def fetch_articles_for_topic(selected_topic):
     all_articles = []
     feeds = feed_config["feeds"]
@@ -65,7 +63,6 @@ def fetch_articles_for_topic(selected_topic):
                 })
     return all_articles
 
-# Display article card
 def display_article_card(article, key_suffix):
     with st.container():
         if article.get("image"):
@@ -78,26 +75,26 @@ def display_article_card(article, key_suffix):
         if st.checkbox("⭐ Add to Top 10", key=f"sel_{article['id']}_{key_suffix}"):
             selected.append(article)
 
-# UI
-st.title("🗂 Maritime News Curator by Topic")
+# UI starts here
+st.title("📰 Maritime Latest News")
 selected = []
 
-# 1. Select topic
-selected_topic = st.selectbox("Choose a topic to fetch news for:", all_topics)
+# Tile UI for topic selection
+st.markdown("### 📂 Choose a topic")
+topic_cols = st.columns(3)
 
-# 2. Fetch when topic is selected
-if selected_topic and st.button("🔍 Fetch News for Topic"):
-    articles = fetch_articles_for_topic(selected_topic)
-    st.session_state["articles"] = articles
-    st.session_state["selected_topic"] = selected_topic
-    st.success(f"Fetched {len(articles)} articles for **{selected_topic}**.")
+for i, topic in enumerate(all_topics):
+    with topic_cols[i % 3]:
+        if st.button(topic, key=f"topic_btn_{topic}"):
+            st.session_state["selected_topic"] = topic
+            st.session_state["articles"] = fetch_articles_for_topic(topic)
 
-# 3. Display results
+# Display fetched articles
 articles = st.session_state.get("articles", [])
 selected_topic = st.session_state.get("selected_topic", None)
 
 if articles:
-    st.markdown(f"## 🔖 {selected_topic} ({len(articles)} articles)")
+    st.markdown(f"## 📌 {selected_topic} ({len(articles)} articles)")
     PAGE_SIZE = 20
     total_pages = math.ceil(len(articles) / PAGE_SIZE)
     page = st.number_input("Page", 1, total_pages, 1, key=f"page_{selected_topic}")
@@ -114,7 +111,7 @@ if articles:
 
     st.divider()
 
-# 4. Export Top 10
+# Export Top 10
 if selected:
     st.subheader("📦 Export Top 10 as Markdown")
     markdown = f"# Maritime Top 10 – {selected_topic}\n\n"
