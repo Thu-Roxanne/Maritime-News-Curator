@@ -102,7 +102,7 @@ for topic, group_articles in sorted_topics:
             st.write(f"🗓 {a['date']}")
             st.write(a['summary'])
             st.markdown(f"[Read more]({a['link']})")
-            if st.checkbox("⭐ Add to Top 10", key=f"sel_{a['id']}"):
+            if st.checkbox("⭐ Add to Top 10", key=f"sel_{topic}_{i}_{a['id']}"):
                 selected.append(a)
 
 # Export
