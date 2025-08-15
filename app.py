@@ -64,13 +64,46 @@ articles = st.session_state.get("articles", [])
 
 selected = []
 
-for i, a in enumerate(articles):
-    with st.expander(f"{a['title']} ({', '.join(a['topics'])})"):
-        st.write(f"🗓 {a['date']}")
-        st.write(a['summary'])
-        st.markdown(f"[Read more]({a['link']})")
-        if st.checkbox("⭐ Add to Top 10", key=f"sel_{i}"):
-            selected.append(a)
+from collections import defaultdict
+
+# Group articles by topic
+topic_buckets = defaultdict(list)
+for article in articles:
+    topics = article.get("topics", [])
+    if not topics:
+        topic_buckets["📂 Uncategorized / Other"].append(article)
+
+    else:
+        for topic in topics:
+            topic_buckets[topic].append(article)
+
+# Sort topics alphabetically
+sorted_topics = sorted(topic_buckets.items())
+
+st.subheader("🧠 Curated Topics")
+
+# Page size
+PAGE_SIZE = 20
+
+for topic, group_articles in sorted_topics:
+    st.markdown(f"### 📌 {topic} ({len(group_articles)} articles)")
+
+    # Add pagination
+    total_pages = (len(group_articles) - 1) // PAGE_SIZE + 1
+    page = st.number_input(
+        f"Page (Topic: {topic})", min_value=1, max_value=total_pages, value=1, key=f"page_{topic}"
+    )
+    start = (page - 1) * PAGE_SIZE
+    end = start + PAGE_SIZE
+    page_articles = group_articles[start:end]
+
+    for i, a in enumerate(page_articles):
+        with st.expander(f"{a['title']}"):
+            st.write(f"🗓 {a['date']}")
+            st.write(a['summary'])
+            st.markdown(f"[Read more]({a['link']})")
+            if st.checkbox("⭐ Add to Top 10", key=f"sel_{a['id']}"):
+                selected.append(a)
 
 # Export
 if selected:
