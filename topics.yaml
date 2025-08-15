@@ -1,0 +1,11 @@
+topics:
+  Supply Chain Management:
+    include: ["supply chain", "logistics", "port congestion", "blank sailings"]
+  AI:
+    include: ["AI", "machine learning", "autonomous", "predictive"]
+  Maritime Safety:
+    include: ["collision", "SAR", "incident", "safety", "SOLAS"]
+  Decarbonization:
+    include: ["IMO 2023", "EEXI", "methanol", "ammonia", "wind assist"]
+  Cybersecurity:
+    include: ["cyber", "phishing", "ransomware", "ICS", "malware"]
