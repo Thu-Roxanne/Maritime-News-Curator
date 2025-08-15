@@ -68,7 +68,7 @@ def fetch_articles():
 # Display single article in card format
 def display_article_card(article):
     with st.container():
-        if article["image"]:
+        if article.get("image"):
             st.image(article["image"], use_column_width=True)
         st.markdown(f"### {article['title']}")
         st.markdown(f"*🗓 {article['date'][:10]}*")
