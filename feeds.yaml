@@ -1,0 +1,15 @@
+feeds:
+  - https://www.maritime-executive.com/rss
+  - https://www.maritimeprofessional.com/rss
+  - https://www.marinelink.com/rss/news/
+  - https://www.hellenicshippingnews.com/feed/
+  - https://splash247.com/feed/
+  - https://www.seatrade-maritime.com/rss.xml
+  - https://www.porttechnology.org/feed/
+  - https://www.imo.org/en/MediaCentre/PressBriefings/Pages/All-articles.aspx?rss=1
+google_news_queries:
+  - "maritime+AI"
+  - "shipping+supply+chain"
+  - "port+automation"
+  - "maritime+safety"
+  - "ballast+water+regulation"
