@@ -1,11 +1,40 @@
 topics:
-  Supply Chain Management:
-    include: ["supply chain", "logistics", "port congestion", "blank sailings"]
-  AI:
-    include: ["AI", "machine learning", "autonomous", "predictive"]
-  Maritime Safety:
-    include: ["collision", "SAR", "incident", "safety", "SOLAS"]
-  Decarbonization:
-    include: ["IMO 2023", "EEXI", "methanol", "ammonia", "wind assist"]
-  Cybersecurity:
-    include: ["cyber", "phishing", "ransomware", "ICS", "malware"]
+  Decarbonization and the Green Transition:
+    include: [
+      "IMO 2023", "EEXI", "CII", "green corridor", 
+      "carbon neutral", "methanol", "ammonia", 
+      "LNG", "biofuel", "wind assist", "decarbonization", 
+      "emissions", "net zero", "fuel transition"
+    ]
+
+  Digitalization and Technology Adoption:
+    include: [
+      "AI", "machine learning", "blockchain", 
+      "automation", "digital twin", "smart port", 
+      "predictive", "technology adoption", "IoT", 
+      "data analytics", "cyber", "digital transformation"
+    ]
+
+  Geopolitical Matters:
+    include: [
+      "Red Sea", "Panama Canal", "Houthi", 
+      "Suez", "conflict", "sanctions", "war", 
+      "geopolitical", "trade war", "strait", 
+      "Middle East", "Ukraine", "China"
+    ]
+
+  Logistics and Supply Chain Management:
+    include: [
+      "supply chain", "logistics", "port congestion", 
+      "container shortage", "inventory", "freight", 
+      "shipment delay", "transport", "blank sailings", 
+      "warehousing", "last mile"
+    ]
+
+  Workforce and Human Elements:
+    include: [
+      "seafarer", "crew", "training", "mental health", 
+      "workforce", "labor", "manning", "diversity", 
+      "women in shipping", "unions", "strike", "IMO conventions", 
+      "human error", "fatigue"
+    ]
