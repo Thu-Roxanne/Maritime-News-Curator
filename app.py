@@ -36,12 +36,8 @@ st.markdown("""
 .badge { display:inline-block; padding: 2px 8px; background: #f1f5f9; border-radius: 999px; font-size: .8rem; color: #0f172a; border: 1px solid #e2e8f0; }
 hr.soft { border:0; border-top:1px solid rgba(0,0,0,.06); margin:18px 0; }
 
-/* Numbered pager */
-.pager { display:flex; align-items:center; gap:.35rem; flex-wrap:wrap; margin:.25rem 0 1rem 0; }
-.pager .btn { padding:.32rem .6rem; border:1px solid rgba(0,0,0,.12); border-radius:10px; background:#fff; }
-.pager .btn:hover { background:#f8fafc; }
-.pager .btn.active { background:#111827; color:#fff; border-color:#111827; }
-.pager .dots { padding:0 .3rem; color:#9CA3AF; }
+/* Dots in pager */
+.pager .dots { color:#9CA3AF; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -135,6 +131,7 @@ def fetch_all_articles(max_age_days: int = 30):
             summary = clean(entry.get("summary", ""))
             link    = (entry.get("link") or "").strip()
             pub_dt  = parse_date_safe(entry.get("published") or entry.get("updated") or "")
+
             # server-side age filter
             age_days = (datetime.now(timezone.utc) - pub_dt).total_seconds() / 86400.0
             if age_days > max_age_days:
@@ -148,7 +145,7 @@ def fetch_all_articles(max_age_days: int = 30):
                     matched_topics.append(topic)
 
             if not matched_topics:
-                continue
+                continue  # only keep items that match at least one topic
 
             items.append({
                 "id": article_id(title, link),
@@ -164,14 +161,12 @@ def fetch_all_articles(max_age_days: int = 30):
     return items
 
 # =========================
-# Numbered pagination helper (with key_prefix to avoid duplicates)
+# Numbered pagination (single, horizontal)
 # =========================
-def render_pagination(total_pages: int, state_key: str = "page", window: int = 2, key_prefix: str = ""):
+def render_pagination(total_pages: int, state_key: str = "page", window: int = 2, key_prefix: str = "top_"):
     """
-    Classic 1 2 3 … pager with Prev/Next.
-
-    key_prefix ensures widget keys are unique when rendering multiple pagers
-    that control the same state_key (e.g., top & bottom).
+    Horizontal pager: ‹ Prev 1 … 4 5 6 … N Next ›
+    Renders in one row using columns.
     """
     current = st.session_state.get(state_key, 1)
     current = max(1, min(current, total_pages))
@@ -180,7 +175,7 @@ def render_pagination(total_pages: int, state_key: str = "page", window: int = 2
     def set_page(n: int):
         st.session_state[state_key] = max(1, min(n, total_pages))
 
-    # Determine which page numbers to show
+    # numbers to show
     pages = [1]
     start = max(2, current - window)
     end   = min(total_pages - 1, current + window)
@@ -192,29 +187,31 @@ def render_pagination(total_pages: int, state_key: str = "page", window: int = 2
     if total_pages > 1:
         pages.append(total_pages)
 
-    # Render
-    st.markdown('<div class="pager">', unsafe_allow_html=True)
+    # columns: Prev + numbers/dots + Next
+    slots = 2 + len(pages)
+    cols = st.columns(slots)
 
     # Prev
-    if st.button("‹ Prev", key=f"{key_prefix}{state_key}_prev", disabled=(current == 1), help="Previous page"):
+    if cols[0].button("‹ Prev", key=f"{key_prefix}{state_key}_prev", disabled=(current == 1)):
         set_page(current - 1)
 
-    # Numbers + dots
+    # Numbers/dots
+    idx = 1
     for p in pages:
         if isinstance(p, str) and p.startswith("dots"):
-            st.markdown('<span class="dots">…</span>', unsafe_allow_html=True)
+            cols[idx].markdown('<span class="pager dots">…</span>', unsafe_allow_html=True)
         else:
             if p == current:
-                st.markdown(f'<span class="btn active">{p}</span>', unsafe_allow_html=True)
+                cols[idx].markdown(f'<span class="btn active">{p}</span>', unsafe_allow_html=True)
             else:
-                if st.button(str(p), key=f"{key_prefix}{state_key}_{p}"):
+                if cols[idx].button(str(p), key=f"{key_prefix}{state_key}_{p}"):
                     set_page(p)
+        idx += 1
 
     # Next
-    if st.button("Next ›", key=f"{key_prefix}{state_key}_next", disabled=(current == total_pages), help="Next page"):
+    if cols[-1].button("Next ›", key=f"{key_prefix}{state_key}_next", disabled=(current == total_pages)):
         set_page(current + 1)
 
-    st.markdown('</div>', unsafe_allow_html=True)
     return st.session_state[state_key]
 
 # =========================
@@ -280,7 +277,7 @@ total_pages = max(1, math.ceil(len(filtered) / PAGE_SIZE))
 if "page" not in st.session_state:
     st.session_state["page"] = 1
 
-# Top pager (unique key_prefix)
+# Single horizontal pager at the top
 current_page = render_pagination(total_pages, state_key="page", window=2, key_prefix="top_")
 
 # Slice for current page
@@ -315,9 +312,6 @@ for i in range(0, len(page_articles), 3):
         if i + j < len(page_articles):
             with cols[j]:
                 display_card(page_articles[i + j], key_suffix=f"{i}_{j}")
-
-# Bottom pager (different key_prefix, same state_key)
-render_pagination(total_pages, state_key="page", window=2, key_prefix="bottom_")
 
 st.divider()
 
