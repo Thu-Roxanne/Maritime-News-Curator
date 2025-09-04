@@ -11,6 +11,8 @@ from urllib.parse import urlparse
 
 st.set_page_config(page_title="Maritime Latest News", layout="wide")
 
+APP_VERSION = "1.1.0"
+
 # =========================
 # CSS – modern card layout
 # =========================
@@ -55,9 +57,21 @@ def load_yaml_safe(path: str, name: str):
         st.error(f"❌ File not found: {name}")
         st.stop()
 
-topic_config = load_yaml_safe("topics.yaml", "topics.yaml")
-feed_config  = load_yaml_safe("feeds.yaml", "feeds.yaml")
-ALL_TOPICS   = list(topic_config.get("topics", {}).keys())
+def read_configs():
+    topic_cfg = load_yaml_safe("topics.yaml", "topics.yaml")
+    feed_cfg  = load_yaml_safe("feeds.yaml", "feeds.yaml")
+    return topic_cfg, feed_cfg
+
+# session-scoped config store so we can reload on demand
+if "topic_config" not in st.session_state or "feed_config" not in st.session_state:
+    tcfg, fcfg = read_configs()
+    st.session_state["topic_config"] = tcfg
+    st.session_state["feed_config"]  = fcfg
+
+topic_config = st.session_state["topic_config"]
+feed_config  = st.session_state["feed_config"]
+
+ALL_TOPICS = sorted(list(topic_config.get("topics", {}).keys()))
 
 DOMAIN_BLOCKLIST = set(feed_config.get("domain_blocklist", []) or [])
 DOMAIN_WEIGHTS   = {k.lower(): float(v) for k, v in (feed_config.get("domain_weights", {}) or {}).items()}
@@ -84,20 +98,16 @@ def parse_date_safe(s: str) -> datetime:
         return datetime.now(timezone.utc)
 
 def extract_image(entry):
-    # media_content
     media = entry.get("media_content", [])
     if isinstance(media, list) and media and media[0].get("url"):
         return media[0]["url"]
-    # thumbnails
     thumbs = entry.get("media_thumbnail", [])
     if isinstance(thumbs, list) and thumbs and thumbs[0].get("url"):
         return thumbs[0]["url"]
-    # try summary HTML
     if entry.get("summary"):
         img = BeautifulSoup(entry["summary"], "html.parser").find("img")
         if img and img.get("src"):
             return img["src"]
-    # try content HTML
     if entry.get("content"):
         html = entry["content"][0].get("value", "")
         img = BeautifulSoup(html, "html.parser").find("img")
@@ -115,14 +125,17 @@ def get_domain(u: str) -> str:
 # Fetch & classify (cached)
 # =========================
 @st.cache_data(show_spinner=True, ttl=600)
-def fetch_all_articles(max_age_days: int = 30):
-    feeds   = feed_config.get("feeds", [])
-    queries = feed_config.get("google_news_queries", [])
+def fetch_all_articles(max_age_days: int, topic_config_snapshot: dict, feed_config_snapshot: dict):
+    feeds   = feed_config_snapshot.get("feeds", [])
+    queries = feed_config_snapshot.get("google_news_queries", [])
     google_feeds = [
         f"https://news.google.com/rss/search?q={urllib.parse.quote_plus(q)}&hl=en-US&gl=US&ceid=US:en"
         for q in queries
     ]
     urls = feeds + google_feeds
+
+    domain_blocklist = set(feed_config_snapshot.get("domain_blocklist", []) or [])
+    domain_weights   = {k.lower(): float(v) for k, v in (feed_config_snapshot.get("domain_weights", {}) or {}).items()}
 
     items = []
     seen_ids = set()
@@ -147,18 +160,18 @@ def fetch_all_articles(max_age_days: int = 30):
                 continue
 
             dom = get_domain(link)
-            if dom in DOMAIN_BLOCKLIST:
+            if dom in domain_blocklist:
                 continue
 
             full_text = f"{title} {summary}"
             matched_topics = []
-            for topic, data in topic_config.get("topics", {}).items():
+            for topic, data in topic_config_snapshot.get("topics", {}).items():
                 include_words = data.get("include", [])
                 if any(w.lower() in full_text.lower() for w in include_words):
                     matched_topics.append(topic)
 
             if not matched_topics:
-                continue  # only keep items that match at least one topic
+                continue
 
             aid = article_id(title, link)
             if aid in seen_ids:
@@ -175,7 +188,7 @@ def fetch_all_articles(max_age_days: int = 30):
                 "topics": matched_topics,
                 "image": extract_image(entry) or "",
                 "domain": dom,
-                "source_weight": DOMAIN_WEIGHTS.get(dom, 1.0),
+                "source_weight": domain_weights.get(dom, 1.0),
             })
     return items
 
@@ -183,10 +196,6 @@ def fetch_all_articles(max_age_days: int = 30):
 # Numbered pagination (single, horizontal)
 # =========================
 def render_pagination(total_pages: int, state_key: str = "page", window: int = 2, key_prefix: str = "top_"):
-    """
-    Horizontal pager: ‹ Prev 1 … 4 5 6 … N Next ›
-    Renders in one row using columns.
-    """
     current = st.session_state.get(state_key, 1)
     current = max(1, min(current, total_pages))
     st.session_state[state_key] = current
@@ -194,7 +203,6 @@ def render_pagination(total_pages: int, state_key: str = "page", window: int = 2
     def set_page(n: int):
         st.session_state[state_key] = max(1, min(n, total_pages))
 
-    # numbers to show
     pages = [1]
     start = max(2, current - window)
     end   = min(total_pages - 1, current + window)
@@ -206,15 +214,12 @@ def render_pagination(total_pages: int, state_key: str = "page", window: int = 2
     if total_pages > 1:
         pages.append(total_pages)
 
-    # columns: Prev + numbers/dots + Next
     slots = 2 + len(pages)
     cols = st.columns(slots)
 
-    # Prev
     if cols[0].button("‹ Prev", key=f"{key_prefix}{state_key}_prev", disabled=(current == 1)):
         set_page(current - 1)
 
-    # Numbers/dots
     idx = 1
     for p in pages:
         if isinstance(p, str) and p.startswith("dots"):
@@ -227,7 +232,6 @@ def render_pagination(total_pages: int, state_key: str = "page", window: int = 2
                     set_page(p)
         idx += 1
 
-    # Next
     if cols[-1].button("Next ›", key=f"{key_prefix}{state_key}_next", disabled=(current == total_pages)):
         set_page(current + 1)
 
@@ -240,6 +244,23 @@ st.title("📰 Maritime Latest News")
 
 with st.sidebar:
     st.markdown("### Filter Options")
+    st.caption(f"App v{APP_VERSION}")
+
+    # Config reload controls
+    col_a, col_b = st.columns(2)
+    with col_a:
+        if st.button("🔁 Reload Configs"):
+            st.session_state["topic_config"], st.session_state["feed_config"] = read_configs()
+            topic_config = st.session_state["topic_config"]
+            feed_config  = st.session_state["feed_config"]
+            ALL_TOPICS[:] = sorted(list(topic_config.get("topics", {}).keys())) if isinstance(ALL_TOPICS, list) else sorted(list(topic_config.get("topics", {}).keys()))
+            st.cache_data.clear()  # clear article cache so new topics apply
+            st.rerun()
+    with col_b:
+        if st.button("🧹 Clear Cache"):
+            st.cache_data.clear()
+            st.rerun()
+
     today = date.today()
     default_from = today.replace(day=max(1, today.day-7))
     date_range = st.date_input("Choose dates", value=(default_from, today))
@@ -248,6 +269,7 @@ with st.sidebar:
     else:
         start_date, end_date = default_from, today
 
+    # Multiselect with sorted topics
     choose_topics = st.multiselect(
         "Choose topics",
         options=ALL_TOPICS,
@@ -258,9 +280,17 @@ with st.sidebar:
     max_age_days = st.slider("Max article age (days)", 1, 60, 30)
     refresh_clicked = st.button("🔄 Refresh News")
 
+# Helpful sanity check
+if "Ports and Port Technology" not in ALL_TOPICS:
+    st.warning("The topic **Ports and Port Technology** was not found in `topics.yaml`. Click **Reload Configs** in the sidebar after saving the file, or check YAML formatting.", icon="⚠️")
+
 # Fetch data (cached)
 if refresh_clicked or "all_articles" not in st.session_state:
-    st.session_state["all_articles"] = fetch_all_articles(max_age_days=max_age_days)
+    st.session_state["all_articles"] = fetch_all_articles(
+        max_age_days=max_age_days,
+        topic_config_snapshot=topic_config,
+        feed_config_snapshot=feed_config
+    )
 articles = st.session_state["all_articles"]
 
 # =========================
@@ -279,7 +309,6 @@ def passes_filters(a: dict) -> bool:
 
 def apply_sort(items: list[dict]) -> list[dict]:
     if sort_by == "Newest first":
-        # Recent first; if same day, prefer higher-weighted sources
         return sorted(items, key=lambda x: (x["date_dt"], x.get("source_weight", 1.0)), reverse=True)
     if sort_by == "Oldest first":
         return sorted(items, key=lambda x: (x["date_dt"], -x.get("source_weight", 1.0)))
@@ -297,10 +326,8 @@ total_pages = max(1, math.ceil(len(filtered) / PAGE_SIZE))
 if "page" not in st.session_state:
     st.session_state["page"] = 1
 
-# Single horizontal pager at the top
 current_page = render_pagination(total_pages, state_key="page", window=2, key_prefix="top_")
 
-# Slice for current page
 start = (current_page - 1) * PAGE_SIZE
 end = start + PAGE_SIZE
 page_articles = filtered[start:end]
@@ -325,7 +352,6 @@ def display_card(article, key_suffix):
         selected.append(article)
     st.markdown("</div>", unsafe_allow_html=True)
 
-# Grid – 3 columns per row
 for i in range(0, len(page_articles), 3):
     cols = st.columns(3)
     for j in range(3):
@@ -335,7 +361,6 @@ for i in range(0, len(page_articles), 3):
 
 st.divider()
 
-# Export Top 10
 if selected:
     st.subheader("📦 Export Top 10 as Markdown")
     md = "# Maritime Top 10\n\n"
