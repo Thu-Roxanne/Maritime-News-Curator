@@ -1,12 +1,9 @@
 topics:
+
   Decarbonization and the Green Transition:
     include:
       - "IMO greenhouse gas"
-      - "MEPC"
       - "MARPOL Annex VI"
-      - "EEXI"
-      - "CII"
-      - "EU ETS"
       - "FuelEU Maritime"
       - "shore power"
       - "cold ironing"
@@ -42,20 +39,12 @@ topics:
       - "port community system"
       - "PCS"
       - "Maritime Single Window"
-      - "MSW"
-      - "S-100"
-      - "ECDIS"
-      - "S-Mode"
-      - "VDES"
       - "satellite AIS"
-      - "eBL"
-      - "DCSA"
-      - "GSBN"
       - "blockchain"
       - "cybersecurity"
-      - "NIS2"
       - "ransomware"
       - "Starlink Maritime"
+      - "Satellites"
 
   Geopolitical Matters:
     include:
@@ -70,7 +59,6 @@ topics:
       - "Ukraine"
       - "Black Sea"
       - "sanctions"
-      - "OFAC"
       - "price cap"
       - "STS transfer"
       - "dark fleet"
@@ -82,15 +70,11 @@ topics:
     include:
       - "freight rates"
       - "spot rates"
-      - "SCFI"
-      - "FBX"
-      - "WCI"
       - "shipment"
       - "delay"
       - "blank sailings"
       - "port congestion"
       - "detention and demurrage"
-      - "GRI"
       - "intermodal"
       - "rail congestion"
       - "inventory"
@@ -119,9 +103,6 @@ topics:
       - "IMO conventions"
       - "human error"
       - "fatigue"
-      - "STCW"
-      - "MLC 2006"
-      - "training"
 
   Ports and Port Technology:
     include:
@@ -144,17 +125,12 @@ topics:
       # equipment
       - "quay crane"
       - "STS crane"
-      - "RTG"
-      - "RMG"
-      - "ASC"
-      - "AGV"
       - "automated guided vehicle"
       - "straddle carrier"
       - "reachstacker"
       - "yard crane"
       # software / ops
       - "terminal operating system"
-      - "TOS"
       - "Navis N4"
       - "Tideworks"
       - "CyberLogitec"
@@ -164,8 +140,6 @@ topics:
       - "gate automation"
       - "OCR"
       - "truck appointment system"
-      - "TAS"
       - "digital port call"
-      - "PCS"
       - "port community system"
       - "5G port"
