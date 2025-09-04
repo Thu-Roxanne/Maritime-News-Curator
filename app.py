@@ -92,53 +92,82 @@ def get_domain(u: str) -> str:
 # --- URL canonicalization & ID helpers ---
 TRACKING_PARAMS = {"utm_source","utm_medium","utm_campaign","utm_term","utm_content","gclid","fbclid","mc_cid","mc_eid","igshid"}
 
+def canonicalize_url_parts(pr):
+    q = parse_qs(pr.query)
+    q = {k: v for k, v in q.items() if k not in TRACKING_PARAMS}
+    query = urllib.parse.urlencode({k: (v[0] if isinstance(v, list) and len(v)==1 else v) for k, v in q.items()}, doseq=True)
+    return pr._replace(query=query, fragment="")
+
 def canonicalize_link(link: str) -> str:
-    """Unwrap Google News and strip tracking params/fragments."""
+    """Strip tracking params/fragments; do NOT unwrap here (done in get_best_link_from_entry)."""
     if not link:
         return link
     try:
         pr = urlparse(link)
-        # unwrap Google News redirection if present
-        if pr.netloc.endswith("news.google.com"):
-            qs = parse_qs(pr.query)
-            # some GN links use 'url='; others have the publisher href inside 'link' in feedparser, but try url first
-            if "url" in qs and qs["url"]:
-                link = qs["url"][0]
-                pr = urlparse(link)
-        # strip tracking params
-        q = parse_qs(pr.query)
-        q = {k: v for k, v in q.items() if k not in TRACKING_PARAMS}
-        query = urllib.parse.urlencode({k: (v[0] if isinstance(v, list) and len(v)==1 else v) for k, v in q.items()}, doseq=True)
-        pr = pr._replace(query=query, fragment="")
+        pr = canonicalize_url_parts(pr)
         return urlunparse(pr)
     except Exception:
         return link
 
-def article_id(title: str, link: str) -> str:
-    """Stable ID that uses canonical link and normalized title."""
-    t = normalize_title(title)
-    l = canonicalize_link(link)
-    return hashlib.sha1(f"{t}::{l}".encode("utf-8")).hexdigest()
+def get_best_link_from_entry(entry) -> str:
+    """
+    Prefer the publisher URL instead of news.google.com.
+    Order: url= param -> entry.source.href -> first non-aggregator in entry.links -> original link.
+    """
+    raw_link = (entry.get("link") or "").strip()
+    try:
+        pr = urlparse(raw_link)
+        # 1) Try url= param
+        if pr.netloc.endswith("news.google.com"):
+            qs = parse_qs(pr.query)
+            if "url" in qs and qs["url"]:
+                return canonicalize_link(qs["url"][0])
 
-# --- Title normalization & matching ---
-SITE_SUFFIX_RE = re.compile(r"\s*[-–—:]\s*[A-Z][A-Za-z0-9&.\s]{2,}$")  # " - Dredging Today"
+            # 2) Try <source href="publisher">
+            src = entry.get("source") or {}
+            if isinstance(src, dict) and src.get("href"):
+                href = src["href"]
+                if get_domain(href) not in AGGREGATORS:
+                    return canonicalize_link(href)
+
+            # 3) Try links list for first non-aggregator href
+            for l in entry.get("links", []):
+                href = l.get("href")
+                if href and get_domain(href) not in AGGREGATORS:
+                    return canonicalize_link(href)
+
+        # 4) Fallback to the given link
+        return canonicalize_link(raw_link)
+    except Exception:
+        return canonicalize_link(raw_link)
+
+SITE_SUFFIX_RE = re.compile(r"\s*[-–—:]\s*[A-Z][A-Za-z0-9&.\s]{2,}$")
 PUNCT_RE = re.compile(r"[^\w\s]")
 
 def normalize_title(title: str) -> str:
     t = (title or "").strip()
-    t = SITE_SUFFIX_RE.sub("", t)  # drop trailing " - Site"
+    t = SITE_SUFFIX_RE.sub("", t)     # drop trailing " - Site Name"
     t = re.sub(r"\s+", " ", t)
     t = PUNCT_RE.sub("", t).lower().strip()
     return t
 
+def article_id(title: str, link: str) -> str:
+    return hashlib.sha1(f"{normalize_title(title)}::{link}".encode("utf-8")).hexdigest()
+
 # =========================
-# Topic matching (robust for ports)
+# Topic matching (incl. ports logic from previous step)
 # =========================
 PORTS_AMBIGUOUS = {"asc", "tos", "ocr", "pcs", "agv", "jit"}
 PORTS_CONTEXT = {
     "port","terminal","container","dock","harbor","harbour","quay","berth",
     "yard","crane","sts","rtg","rmg","straddle","reachstacker","bunkering",
-    "mooring","pilotage","dredging","concession","gate","tug"
+    "mooring","pilotage","dredging","concession","gate","tug","authority"
+}
+PORTS_TECH_STRONG = {
+    "terminal operating system","navis n4","tideworks","cyberlogitec","tos",
+    "ocr","truck appointment system","tas","port call optimization","just-in-time arrival","jit arrival",
+    "quay crane","sts crane","rtg","rmg","asc","straddle carrier","reachstacker","agv","automated guided vehicle",
+    "5g port","gate automation","pcs","port community system"
 }
 
 def _contains(text_lower: str, phrase: str) -> bool:
@@ -149,28 +178,45 @@ def _contains(text_lower: str, phrase: str) -> bool:
         return re.search(rf"\b{re.escape(p)}\b", text_lower, flags=re.IGNORECASE) is not None
     return p.lower() in text_lower
 
-def matched_topics_for(text: str) -> list:
+def ports_score_and_flag(text_lower: str, hits: list[str]) -> tuple[float, bool]:
+    dredging_hit = any("dredging" in h.lower() for h in hits)
+    tech_hit = any(h.lower() in PORTS_TECH_STRONG for h in hits)
+    context_ok = any(w in text_lower for w in PORTS_CONTEXT)
+    score = 1.0
+    if tech_hit: score += 1.2
+    if context_ok: score += 0.4
+    dredging_only = False
+    if dredging_hit and not tech_hit:
+        score -= 0.8
+        dredging_only = True
+    if dredging_hit and any(k in text_lower for k in ["port expansion","terminal concession","berth expansion","quay wall"]):
+        score += 0.3
+        dredging_only = False
+    return score, dredging_only
+
+def matched_topics_for(text: str) -> tuple[list, dict]:
     tl = text.lower()
     matched = []
+    meta = {}
     for topic, data in topic_config.get("topics", {}).items():
         includes = data.get("include", []) or []
         excludes = data.get("exclude", []) or []
-
         if any(_contains(tl, ex) for ex in excludes):
             continue
-
         hits = [kw for kw in includes if _contains(tl, kw)]
         if not hits:
             continue
-
         if topic.lower().startswith("ports and port"):
             ambig_hits = [h for h in hits if h.lower() in PORTS_AMBIGUOUS]
             non_ambig_hits = [h for h in hits if h.lower() not in PORTS_AMBIGUOUS]
             if non_ambig_hits or any(w in tl for w in PORTS_CONTEXT):
                 matched.append(topic)
+                score, dredging_only = ports_score_and_flag(tl, hits)
+                meta["ports_score"] = score
+                meta["ports_dredging_only"] = dredging_only
         else:
             matched.append(topic)
-    return matched
+    return matched, meta
 
 # =========================
 # Fetch, classify, deduplicate (cached)
@@ -199,8 +245,7 @@ def fetch_all_articles(max_age_days: int = 30):
         for entry in d.entries:
             raw_title = clean(entry.get("title", ""))
             summary   = clean(entry.get("summary", ""))
-            raw_link  = (entry.get("link") or "").strip()
-            link      = canonicalize_link(raw_link)
+            link      = get_best_link_from_entry(entry)
             pub_dt    = parse_date_safe(entry.get("published") or entry.get("updated") or "")
 
             # server-side age filter
@@ -213,9 +258,9 @@ def fetch_all_articles(max_age_days: int = 30):
                 continue
 
             full_text = f"{raw_title} {summary}"
-            topics = matched_topics_for(full_text)
+            topics, meta = matched_topics_for(full_text)
             if not topics:
-                continue  # keep only items that match at least one topic
+                continue
 
             aid = article_id(raw_title, link)
             if aid in seen_ids:
@@ -235,26 +280,23 @@ def fetch_all_articles(max_age_days: int = 30):
                 "domain": dom,
                 "source_weight": DOMAIN_WEIGHTS.get(dom, 1.0),
                 "is_aggregator": dom in AGGREGATORS,
+                "ports_score": meta.get("ports_score", 1.0),
+                "ports_dredging_only": meta.get("ports_dredging_only", False),
             })
 
-    # Deduplicate similar stories appearing via aggregators / alt links
     return deduplicate_articles(items)
 
 def deduplicate_articles(items: list) -> list:
-    """
-    Keep one representative per story cluster.
-    Prefers non-aggregators, higher-weighted sources, then newer items.
-    """
     if not items:
         return items
 
-    # Sort best-first for selection
+    # Sort with a stronger preference for non-aggregators
     items_sorted = sorted(
         items,
         key=lambda x: (
-            x["date_dt"],
-            x.get("source_weight", 1.0),
-            0 if not x.get("is_aggregator") else -1  # non-aggregator > aggregator
+            1 if not x.get("is_aggregator") else 0,          # non-aggregator first
+            x.get("source_weight", 1.0),                     # higher weight first
+            x["date_dt"]                                     # newest first
         ),
         reverse=True
     )
@@ -263,38 +305,50 @@ def deduplicate_articles(items: list) -> list:
     for art in items_sorted:
         duplicate = False
 
-        # URL equality (ignoring params already normalized)
+        # Exact-link dedupe
         for k in kept:
             if art["link"] == k["link"]:
                 duplicate = True
                 break
-
         if duplicate:
             continue
 
-        # Same domain + similar path and very similar title
+        # Same-domain fuzzy title dedupe
         for k in kept:
             if art["domain"] == k["domain"]:
-                # strong title match threshold
-                if fuzz.token_set_ratio(art["norm_title"], k["norm_title"]) >= 92:
+                if fuzz.token_set_ratio(art["norm_title"], k["norm_title"]) >= 90:
                     duplicate = True
                     break
-
         if duplicate:
             continue
 
-        # Cross-domain fuzzy title dedupe (aggregators vs originals)
+        # Aggregator vs original: be more aggressive
         for k in kept:
-            if art["is_aggregator"] or k["is_aggregator"]:
-                if fuzz.token_set_ratio(art["norm_title"], k["norm_title"]) >= 94:
+            sim = fuzz.token_set_ratio(art["norm_title"], k["norm_title"])
+            if art["is_aggregator"] != k["is_aggregator"] and sim >= 88:
+                # drop the aggregator, keep the original
+                if art["is_aggregator"]:
                     duplicate = True
+                    break
+                else:
+                    # rare case: we kept aggregator earlier; replace with original
+                    kept.remove(k)
                     break
 
         if not duplicate:
             kept.append(art)
 
-    # Re-sort for display (newest first; tie-breaker by source weight)
-    kept = sorted(kept, key=lambda x: (x["date_dt"], x.get("source_weight", 1.0)), reverse=True)
+    # Final order for display
+    kept = sorted(
+        kept,
+        key=lambda x: (
+            x["date_dt"],
+            x.get("source_weight", 1.0),
+            x.get("ports_score", 1.0),
+            1 if not x.get("is_aggregator") else 0
+        ),
+        reverse=True
+    )
     return kept
 
 # =========================
@@ -322,9 +376,6 @@ def extract_image(entry):
 # Numbered pagination (single, horizontal)
 # =========================
 def render_pagination(total_pages: int, state_key: str = "page", window: int = 2, key_prefix: str = "top_"):
-    """
-    Horizontal pager: ‹ Prev 1 … 4 5 6 … N Next ›
-    """
     current = st.session_state.get(state_key, 1)
     current = max(1, min(current, total_pages))
     st.session_state[state_key] = current
@@ -413,9 +464,9 @@ def passes_filters(a: dict) -> bool:
 
 def apply_sort(items: list[dict]) -> list[dict]:
     if sort_by == "Newest first":
-        return sorted(items, key=lambda x: (x["date_dt"], x.get("source_weight", 1.0)), reverse=True)
+        return sorted(items, key=lambda x: (x["date_dt"], x.get("source_weight", 1.0), 1 if not x.get("is_aggregator") else 0, x.get("ports_score", 1.0)), reverse=True)
     if sort_by == "Oldest first":
-        return sorted(items, key=lambda x: (x["date_dt"], -x.get("source_weight", 1.0)))
+        return sorted(items, key=lambda x: (x["date_dt"], -x.get("source_weight", 1.0), - (1 if not x.get("is_aggregator") else 0), -x.get("ports_score", 1.0)))
     return sorted(items, key=lambda x: x["title"].lower())
 
 filtered = apply_sort([a for a in articles if passes_filters(a)])
@@ -456,7 +507,6 @@ def display_card(article, key_suffix):
         selected.append(article)
     st.markdown("</div>", unsafe_allow_html=True)
 
-# Grid – 3 columns per row
 for i in range(0, len(page_articles), 3):
     cols = st.columns(3)
     for j in range(3):
@@ -466,7 +516,6 @@ for i in range(0, len(page_articles), 3):
 
 st.divider()
 
-# Export Top 10
 if selected:
     st.subheader("📦 Export Top 10 as Markdown")
     md = "# Maritime Top 10\n\n"
