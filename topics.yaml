@@ -46,4 +46,21 @@ topics:
       "human error", "fatigue",  "STCW", "MLC 2006", "training"
     ]
 
-
+Ports and Port Technology:
+    include: [
+      # infrastructure / development
+      "port expansion", "terminal concession", "greenfield port", 
+      "freeport", "dredging", "breakwater", "berth expansion", "quay wall",
+      "mooring", "pilotage", "tug", "bunkering", "LNG bunkering",
+      "methanol bunkering", "ammonia bunkering",
+      # equipment
+      "quay crane", "STS crane", "RTG", "RMG", "ASC",
+      "AGV", "automated guided vehicle", "straddle carrier",
+      "reachstacker", "yard crane",
+      # software / ops
+      "terminal operating system", "TOS", "Navis N4",
+      "Tideworks", "CyberLogitec", "port call optimization",
+      "just-in-time arrival", "JIT arrival", "gate automation",
+      "OCR", "truck appointment system", "TAS", "digital port call",
+      "PCS", "port community system", "5G port"
+    ]
