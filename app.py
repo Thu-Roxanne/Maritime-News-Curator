@@ -19,9 +19,6 @@ st.markdown("""
 :root { --card-radius:14px; --card-shadow:0 4px 20px rgba(0,0,0,.06); }
 .block-container { padding-top: 1.2rem; }
 
-/* Sidebar polish */
-.css-1d391kg, .css-1d391kg div[role="radiogroup"] { gap: .5rem; }
-
 /* Cards */
 .news-card {
   background: #fff;
@@ -32,31 +29,11 @@ st.markdown("""
   min-height: 100%;
 }
 .news-card:hover { transform: translateY(-1px); }
-.news-title {
-  font-size: 1.15rem;
-  font-weight: 700;
-  line-height: 1.25;
-  margin: 6px 0 6px 0;
-}
-.news-meta {
-  color: #6b7280;
-  font-size: 0.9rem;
-  margin-bottom: 6px;
-}
-.news-summary {
-  color: #374151;
-  font-size: .95rem;
-}
+.news-title { font-size: 1.15rem; font-weight: 700; line-height: 1.25; margin: 6px 0 6px 0; }
+.news-meta { color: #6b7280; font-size: 0.9rem; margin-bottom: 6px; }
+.news-summary { color: #374151; font-size: .95rem; }
 .news-thumb img { border-radius: 10px; }
-.badge {
-  display:inline-block;
-  padding: 2px 8px;
-  background: #f1f5f9;
-  border-radius: 999px;
-  font-size: .8rem;
-  color: #0f172a;
-  border: 1px solid #e2e8f0;
-}
+.badge { display:inline-block; padding: 2px 8px; background: #f1f5f9; border-radius: 999px; font-size: .8rem; color: #0f172a; border: 1px solid #e2e8f0; }
 hr.soft { border:0; border-top:1px solid rgba(0,0,0,.06); margin:18px 0; }
 
 /* Numbered pager */
@@ -171,7 +148,7 @@ def fetch_all_articles(max_age_days: int = 30):
                     matched_topics.append(topic)
 
             if not matched_topics:
-                continue  # only keep items that match at least one topic
+                continue
 
             items.append({
                 "id": article_id(title, link),
@@ -187,14 +164,14 @@ def fetch_all_articles(max_age_days: int = 30):
     return items
 
 # =========================
-# Numbered pagination helper
+# Numbered pagination helper (with key_prefix to avoid duplicates)
 # =========================
-def render_pagination(total_pages: int, state_key: str = "page", window: int = 2):
+def render_pagination(total_pages: int, state_key: str = "page", window: int = 2, key_prefix: str = ""):
     """
     Classic 1 2 3 … pager with Prev/Next.
-    - total_pages: total number of pages (>=1)
-    - state_key: session_state key for the current page
-    - window: how many pages to show on each side of current page
+
+    key_prefix ensures widget keys are unique when rendering multiple pagers
+    that control the same state_key (e.g., top & bottom).
     """
     current = st.session_state.get(state_key, 1)
     current = max(1, min(current, total_pages))
@@ -219,7 +196,7 @@ def render_pagination(total_pages: int, state_key: str = "page", window: int = 2
     st.markdown('<div class="pager">', unsafe_allow_html=True)
 
     # Prev
-    if st.button("‹ Prev", key=f"{state_key}_prev", disabled=(current == 1), help="Previous page"):
+    if st.button("‹ Prev", key=f"{key_prefix}{state_key}_prev", disabled=(current == 1), help="Previous page"):
         set_page(current - 1)
 
     # Numbers + dots
@@ -230,11 +207,11 @@ def render_pagination(total_pages: int, state_key: str = "page", window: int = 2
             if p == current:
                 st.markdown(f'<span class="btn active">{p}</span>', unsafe_allow_html=True)
             else:
-                if st.button(str(p), key=f"{state_key}_{p}"):
+                if st.button(str(p), key=f"{key_prefix}{state_key}_{p}"):
                     set_page(p)
 
     # Next
-    if st.button("Next ›", key=f"{state_key}_next", disabled=(current == total_pages), help="Next page"):
+    if st.button("Next ›", key=f"{key_prefix}{state_key}_next", disabled=(current == total_pages), help="Next page"):
         set_page(current + 1)
 
     st.markdown('</div>', unsafe_allow_html=True)
@@ -258,7 +235,7 @@ with st.sidebar:
     choose_topics = st.multiselect(
         "Choose topics",
         options=ALL_TOPICS,
-        default=ALL_TOPICS  # show everything initially
+        default=ALL_TOPICS
     )
 
     sort_by = st.selectbox("Sort by", ["Newest first", "Oldest first", "Title A→Z"])
@@ -278,12 +255,10 @@ def date_in_window(dt: datetime, start_d: date, end_d: date) -> bool:
     return (d >= start_d) and (d <= end_d)
 
 def passes_filters(a: dict) -> bool:
-    if choose_topics:
-        if not any(t in choose_topics for t in a["topics"]):
-            return False
-    if start_date and end_date:
-        if not date_in_window(a["date_dt"], start_date, end_d=end_date):
-            return False
+    if choose_topics and not any(t in choose_topics for t in a["topics"]):
+        return False
+    if start_date and end_date and not date_in_window(a["date_dt"], start_date, end_date):
+        return False
     return True
 
 def apply_sort(items: list[dict]) -> list[dict]:
@@ -305,8 +280,8 @@ total_pages = max(1, math.ceil(len(filtered) / PAGE_SIZE))
 if "page" not in st.session_state:
     st.session_state["page"] = 1
 
-# Top pager
-current_page = render_pagination(total_pages, state_key="page", window=2)
+# Top pager (unique key_prefix)
+current_page = render_pagination(total_pages, state_key="page", window=2, key_prefix="top_")
 
 # Slice for current page
 start = (current_page - 1) * PAGE_SIZE
@@ -322,10 +297,7 @@ def display_card(article, key_suffix):
     st.markdown(f'<div class="news-title">{article["title"]}</div>', unsafe_allow_html=True)
     date_str = article["date"][:10]
     dom = article.get("domain", "")
-    st.markdown(
-        f'<div class="news-meta">📅 {date_str} &nbsp;&nbsp;•&nbsp;&nbsp; 🔖 {dom}</div>',
-        unsafe_allow_html=True
-    )
+    st.markdown(f'<div class="news-meta">📅 {date_str} &nbsp;&nbsp;•&nbsp;&nbsp; 🔖 {dom}</div>', unsafe_allow_html=True)
     chips = " ".join([f'<span class="badge">{t}</span>' for t in article["topics"][:3]])
     if chips:
         st.markdown(chips, unsafe_allow_html=True)
@@ -344,8 +316,8 @@ for i in range(0, len(page_articles), 3):
             with cols[j]:
                 display_card(page_articles[i + j], key_suffix=f"{i}_{j}")
 
-# Bottom pager (optional, mirrors top)
-render_pagination(total_pages, state_key="page", window=2)
+# Bottom pager (different key_prefix, same state_key)
+render_pagination(total_pages, state_key="page", window=2, key_prefix="bottom_")
 
 st.divider()
 
