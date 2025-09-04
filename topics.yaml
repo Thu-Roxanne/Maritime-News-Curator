@@ -1,66 +1,171 @@
 topics:
-
   Decarbonization and the Green Transition:
-    include: [
-      "IMO greenhouse gas", "MEPC", "MARPOL Annex VI",
-      "EEXI", "CII", "EU ETS", "FuelEU Maritime",
-      "shore power", "cold ironing", "OPS",
-      "methanol", "e-methanol", "ammonia", "e-ammonia",
-      "LNG", "bio-LNG", "biofuel", "hydrogen",
-      "wind assist", "rotor sails", "carbon levy",
-      "methane slip", "MRV", "DCS", "net zero", "emissions", "fuel transition", "sustainability"
-    ]
+    include:
+      - "IMO greenhouse gas"
+      - "MEPC"
+      - "MARPOL Annex VI"
+      - "EEXI"
+      - "CII"
+      - "EU ETS"
+      - "FuelEU Maritime"
+      - "shore power"
+      - "cold ironing"
+      - "OPS"
+      - "methanol"
+      - "e-methanol"
+      - "ammonia"
+      - "e-ammonia"
+      - "LNG"
+      - "bio-LNG"
+      - "biofuel"
+      - "hydrogen"
+      - "wind assist"
+      - "rotor sails"
+      - "carbon levy"
+      - "methane slip"
+      - "MRV"
+      - "DCS"
+      - "net zero"
+      - "emissions"
+      - "fuel transition"
+      - "sustainability"
 
   Digitalization and Technology Adoption:
-    include: [
-      "AI", "generative AI", "LLM", "computer vision",
-      "automation", "robotics", "digital twin",
-      "port community system", "PCS", "Maritime Single Window", "MSW",
-      "S-100", "ECDIS", "S-Mode", "VDES", "satellite AIS",
-      "eBL", "DCSA", "GSBN", "blockchain",
-      "cybersecurity", "NIS2", "ransomware", "Starlink Maritime"
-    ]
+    include:
+      - "AI"
+      - "generative AI"
+      - "LLM"
+      - "computer vision"
+      - "automation"
+      - "robotics"
+      - "digital twin"
+      - "port community system"
+      - "PCS"
+      - "Maritime Single Window"
+      - "MSW"
+      - "S-100"
+      - "ECDIS"
+      - "S-Mode"
+      - "VDES"
+      - "satellite AIS"
+      - "eBL"
+      - "DCSA"
+      - "GSBN"
+      - "blockchain"
+      - "cybersecurity"
+      - "NIS2"
+      - "ransomware"
+      - "Starlink Maritime"
 
   Geopolitical Matters:
-    include: [
-      "Red Sea", "Bab el-Mandeb", "Houthi",
-      "Suez", "Panama Canal", "Strait of Hormuz",
-      "South China Sea", "Taiwan", "Ukraine", "Black Sea",
-      "sanctions", "OFAC", "price cap", "STS transfer", "dark fleet",
-      "piracy", "Gulf of Guinea", "Somalia"
-    ]
+    include:
+      - "Red Sea"
+      - "Bab el-Mandeb"
+      - "Houthi"
+      - "Suez"
+      - "Panama Canal"
+      - "Strait of Hormuz"
+      - "South China Sea"
+      - "Taiwan"
+      - "Ukraine"
+      - "Black Sea"
+      - "sanctions"
+      - "OFAC"
+      - "price cap"
+      - "STS transfer"
+      - "dark fleet"
+      - "piracy"
+      - "Gulf of Guinea"
+      - "Somalia"
 
   Logistics and Supply Chain Management:
-      include: [
-      "freight rates", "spot rates", "SCFI", "FBX", "WCI", "shipment", "delay",
-      "blank sailings", "port congestion", "detention and demurrage",
-      "GRI", "intermodal", "rail congestion", "inventory", "freight", "logistics", 
-      "berth productivity", "throughput", "TEU", "transport", "containers", "supply chain"
-    ]
+    include:
+      - "freight rates"
+      - "spot rates"
+      - "SCFI"
+      - "FBX"
+      - "WCI"
+      - "shipment"
+      - "delay"
+      - "blank sailings"
+      - "port congestion"
+      - "detention and demurrage"
+      - "GRI"
+      - "intermodal"
+      - "rail congestion"
+      - "inventory"
+      - "freight"
+      - "logistics"
+      - "berth productivity"
+      - "throughput"
+      - "TEU"
+      - "transport"
+      - "containers"
+      - "supply chain"
 
   Workforce and Human Elements:
-    include: [
-      "seafarer", "crew", "training", "mental health", 
-      "workforce", "labor", "manning", "diversity", 
-      "women in shipping", "unions", "strike", "IMO conventions", 
-      "human error", "fatigue",  "STCW", "MLC 2006", "training"
-    ]
+    include:
+      - "seafarer"
+      - "crew"
+      - "training"
+      - "mental health"
+      - "workforce"
+      - "labor"
+      - "manning"
+      - "diversity"
+      - "women in shipping"
+      - "unions"
+      - "strike"
+      - "IMO conventions"
+      - "human error"
+      - "fatigue"
+      - "STCW"
+      - "MLC 2006"
+      - "training"
 
-Ports and Port Technology:
-    include: [
+  Ports and Port Technology:
+    include:
       # infrastructure / development
-      "port expansion", "terminal concession", "greenfield port", 
-      "freeport", "dredging", "breakwater", "berth expansion", "quay wall",
-      "mooring", "pilotage", "tug", "bunkering", "LNG bunkering",
-      "methanol bunkering", "ammonia bunkering",
+      - "port expansion"
+      - "terminal concession"
+      - "greenfield port"
+      - "freeport"
+      - "dredging"
+      - "breakwater"
+      - "berth expansion"
+      - "quay wall"
+      - "mooring"
+      - "pilotage"
+      - "tug"
+      - "bunkering"
+      - "LNG bunkering"
+      - "methanol bunkering"
+      - "ammonia bunkering"
       # equipment
-      "quay crane", "STS crane", "RTG", "RMG", "ASC",
-      "AGV", "automated guided vehicle", "straddle carrier",
-      "reachstacker", "yard crane",
+      - "quay crane"
+      - "STS crane"
+      - "RTG"
+      - "RMG"
+      - "ASC"
+      - "AGV"
+      - "automated guided vehicle"
+      - "straddle carrier"
+      - "reachstacker"
+      - "yard crane"
       # software / ops
-      "terminal operating system", "TOS", "Navis N4",
-      "Tideworks", "CyberLogitec", "port call optimization",
-      "just-in-time arrival", "JIT arrival", "gate automation",
-      "OCR", "truck appointment system", "TAS", "digital port call",
-      "PCS", "port community system", "5G port"
-    ]
+      - "terminal operating system"
+      - "TOS"
+      - "Navis N4"
+      - "Tideworks"
+      - "CyberLogitec"
+      - "port call optimization"
+      - "just-in-time arrival"
+      - "JIT arrival"
+      - "gate automation"
+      - "OCR"
+      - "truck appointment system"
+      - "TAS"
+      - "digital port call"
+      - "PCS"
+      - "port community system"
+      - "5G port"
