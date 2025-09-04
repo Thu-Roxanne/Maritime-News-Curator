@@ -1,34 +1,41 @@
 topics:
+
   Decarbonization and the Green Transition:
     include: [
-      "IMO 2023", "EEXI", "CII", "green corridor", 
-      "carbon neutral", "methanol", "ammonia", 
-      "LNG", "biofuel", "wind assist", "decarbonization", 
-      "emissions", "net zero", "fuel transition"
+      "IMO greenhouse gas", "MEPC", "MARPOL Annex VI",
+      "EEXI", "CII", "EU ETS", "FuelEU Maritime",
+      "shore power", "cold ironing", "OPS",
+      "methanol", "e-methanol", "ammonia", "e-ammonia",
+      "LNG", "bio-LNG", "biofuel", "hydrogen",
+      "wind assist", "rotor sails", "carbon levy",
+      "methane slip", "MRV", "DCS", "net zero", "emissions", "fuel transition", "sustainability"
     ]
 
   Digitalization and Technology Adoption:
     include: [
-      "AI", "machine learning", "blockchain", 
-      "automation", "digital twin", "smart port", 
-      "predictive", "technology adoption", "IoT", 
-      "data analytics", "cyber", "digital transformation"
+      "AI", "generative AI", "LLM", "computer vision",
+      "automation", "robotics", "digital twin",
+      "port community system", "PCS", "Maritime Single Window", "MSW",
+      "S-100", "ECDIS", "S-Mode", "VDES", "satellite AIS",
+      "eBL", "DCSA", "GSBN", "blockchain",
+      "cybersecurity", "NIS2", "ransomware", "Starlink Maritime"
     ]
 
   Geopolitical Matters:
     include: [
-      "Red Sea", "Panama Canal", "Houthi", 
-      "Suez", "conflict", "sanctions", "war", 
-      "geopolitical", "trade war", "strait", 
-      "Middle East", "Ukraine", "China"
+      "Red Sea", "Bab el-Mandeb", "Houthi",
+      "Suez", "Panama Canal", "Strait of Hormuz",
+      "South China Sea", "Taiwan", "Ukraine", "Black Sea",
+      "sanctions", "OFAC", "price cap", "ST*S transfer", "dark fleet",
+      "piracy", "Gulf of Guinea", "Somalia"
     ]
 
   Logistics and Supply Chain Management:
-    include: [
-      "supply chain", "logistics", "port congestion", 
-      "container shortage", "inventory", "freight", 
-      "shipment delay", "transport", "blank sailings", 
-      "warehousing", "last mile"
+      include: [
+      "freight rates", "spot rates", "SCFI", "FBX", "WCI", "shipment", "delay"
+      "blank sailings", "port congestion", "detention and demurrage",
+      "GRI", "intermodal", "rail congestion", "inventory", "freight", "logistics", 
+      "berth productivity", "throughput", "TEU", "transport", "containers", "supply chain"
     ]
 
   Workforce and Human Elements:
@@ -36,5 +43,6 @@ topics:
       "seafarer", "crew", "training", "mental health", 
       "workforce", "labor", "manning", "diversity", 
       "women in shipping", "unions", "strike", "IMO conventions", 
-      "human error", "fatigue"
+      "human error", "fatigue",  "STCW", "MLC 2006", "training"
     ]
+
