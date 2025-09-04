@@ -39,11 +39,9 @@ google_news_queries:
   - "SOLAS OR ISM Code OR \"Port State Control\" OR \"Paris MoU\" when:30d"
 
   # Ports & Port Technology
-  - "\"terminal operating system\" OR TOS OR \"Navis N4\" OR Tideworks OR CyberLogitec when:30d"
   - "\"quay crane\" OR \"STS crane\" OR RTG OR RMG OR ASC OR \"straddle carrier\" when:30d"
   - "\"gate automation\" OR OCR OR \"truck appointment system\" OR TAS when:30d"
   - "\"port call optimization\" OR \"just-in-time arrival\" OR JIT arrival when:30d"
-  - "dredging OR \"berth expansion\" OR \"terminal concession\" OR \"port expansion\" when:30d"
   - "\"LNG bunkering\" OR \"methanol bunkering\" OR \"ammonia bunkering\" when:30d"
 
 domain_blocklist:
@@ -51,3 +49,4 @@ domain_blocklist:
   - presscontact.co
   - yahoo.com
   - medium.com
+
