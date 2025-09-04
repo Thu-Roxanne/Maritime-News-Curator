@@ -7,8 +7,9 @@ from datetime import datetime, timezone, date
 from bs4 import BeautifulSoup
 import math
 from dateutil import parser as dparser
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs, urlunparse
 import re
+from rapidfuzz import fuzz
 
 st.set_page_config(page_title="Maritime Latest News", layout="wide")
 
@@ -62,6 +63,7 @@ ALL_TOPICS   = sorted(list(topic_config.get("topics", {}).keys()))
 
 DOMAIN_BLOCKLIST = set(feed_config.get("domain_blocklist", []) or [])
 DOMAIN_WEIGHTS   = {k.lower(): float(v) for k, v in (feed_config.get("domain_weights", {}) or {}).items()}
+AGGREGATORS      = {"news.google.com", "news.yahoo.com", "finance.yahoo.com", "feedproxy.google.com"}
 
 # =========================
 # Utilities
@@ -72,9 +74,6 @@ def clean(text):
         return BeautifulSoup(s, "html.parser").get_text().strip()
     return s.strip()
 
-def article_id(title, link):
-    return hashlib.sha1(f"{title}{link}".encode()).hexdigest()
-
 def parse_date_safe(s: str) -> datetime:
     if not s:
         return datetime.now(timezone.utc)
@@ -84,48 +83,68 @@ def parse_date_safe(s: str) -> datetime:
     except Exception:
         return datetime.now(timezone.utc)
 
-def extract_image(entry):
-    media = entry.get("media_content", [])
-    if isinstance(media, list) and media and media[0].get("url"):
-        return media[0]["url"]
-    thumbs = entry.get("media_thumbnail", [])
-    if isinstance(thumbs, list) and thumbs and thumbs[0].get("url"):
-        return thumbs[0]["url"]
-    if entry.get("summary"):
-        img = BeautifulSoup(entry["summary"], "html.parser").find("img")
-        if img and img.get("src"):
-            return img["src"]
-    if entry.get("content"):
-        html = entry["content"][0].get("value", "")
-        img = BeautifulSoup(html, "html.parser").find("img")
-        if img and img.get("src"):
-            return img["src"]
-    return ""
-
 def get_domain(u: str) -> str:
     try:
         return urlparse(u).netloc.lower().replace("www.", "")
     except Exception:
         return ""
 
+# --- URL canonicalization & ID helpers ---
+TRACKING_PARAMS = {"utm_source","utm_medium","utm_campaign","utm_term","utm_content","gclid","fbclid","mc_cid","mc_eid","igshid"}
+
+def canonicalize_link(link: str) -> str:
+    """Unwrap Google News and strip tracking params/fragments."""
+    if not link:
+        return link
+    try:
+        pr = urlparse(link)
+        # unwrap Google News redirection if present
+        if pr.netloc.endswith("news.google.com"):
+            qs = parse_qs(pr.query)
+            # some GN links use 'url='; others have the publisher href inside 'link' in feedparser, but try url first
+            if "url" in qs and qs["url"]:
+                link = qs["url"][0]
+                pr = urlparse(link)
+        # strip tracking params
+        q = parse_qs(pr.query)
+        q = {k: v for k, v in q.items() if k not in TRACKING_PARAMS}
+        query = urllib.parse.urlencode({k: (v[0] if isinstance(v, list) and len(v)==1 else v) for k, v in q.items()}, doseq=True)
+        pr = pr._replace(query=query, fragment="")
+        return urlunparse(pr)
+    except Exception:
+        return link
+
+def article_id(title: str, link: str) -> str:
+    """Stable ID that uses canonical link and normalized title."""
+    t = normalize_title(title)
+    l = canonicalize_link(link)
+    return hashlib.sha1(f"{t}::{l}".encode("utf-8")).hexdigest()
+
+# --- Title normalization & matching ---
+SITE_SUFFIX_RE = re.compile(r"\s*[-–—:]\s*[A-Z][A-Za-z0-9&.\s]{2,}$")  # " - Dredging Today"
+PUNCT_RE = re.compile(r"[^\w\s]")
+
+def normalize_title(title: str) -> str:
+    t = (title or "").strip()
+    t = SITE_SUFFIX_RE.sub("", t)  # drop trailing " - Site"
+    t = re.sub(r"\s+", " ", t)
+    t = PUNCT_RE.sub("", t).lower().strip()
+    return t
+
 # =========================
-# Topic matching (robust)
+# Topic matching (robust for ports)
 # =========================
-# Ambiguous short acronyms used in Ports topic that often collide with finance/accounting/etc.
 PORTS_AMBIGUOUS = {"asc", "tos", "ocr", "pcs", "agv", "jit"}
-# Context words that must co-occur when an ambiguous token is the only hit
 PORTS_CONTEXT = {
     "port","terminal","container","dock","harbor","harbour","quay","berth",
     "yard","crane","sts","rtg","rmg","straddle","reachstacker","bunkering",
-    "mooring","pilotage","dredging","concession"
+    "mooring","pilotage","dredging","concession","gate","tug"
 }
 
 def _contains(text_lower: str, phrase: str) -> bool:
-    """Case-insensitive match with smarter handling of very short tokens."""
     p = phrase.strip()
     if not p:
         return False
-    # For 3-or-fewer letter tokens (likely acronyms), use word boundaries
     if len(p) <= 3 and p.replace("-", "").isalpha():
         return re.search(rf"\b{re.escape(p)}\b", text_lower, flags=re.IGNORECASE) is not None
     return p.lower() in text_lower
@@ -144,23 +163,17 @@ def matched_topics_for(text: str) -> list:
         if not hits:
             continue
 
-        # Extra guard for Ports topic to avoid false positives (e.g., "ASC 740")
         if topic.lower().startswith("ports and port"):
             ambig_hits = [h for h in hits if h.lower() in PORTS_AMBIGUOUS]
             non_ambig_hits = [h for h in hits if h.lower() not in PORTS_AMBIGUOUS]
-            if non_ambig_hits:
+            if non_ambig_hits or any(w in tl for w in PORTS_CONTEXT):
                 matched.append(topic)
-                continue
-            # Only ambiguous tokens matched ⇒ require a context word too
-            if any(word in tl for word in PORTS_CONTEXT):
-                matched.append(topic)
-            # else: drop (likely not a ports article)
         else:
             matched.append(topic)
     return matched
 
 # =========================
-# Fetch & classify (cached)
+# Fetch, classify, deduplicate (cached)
 # =========================
 @st.cache_data(show_spinner=True, ttl=600)
 def fetch_all_articles(max_age_days: int = 30):
@@ -184,10 +197,11 @@ def fetch_all_articles(max_age_days: int = 30):
             continue
 
         for entry in d.entries:
-            title   = clean(entry.get("title", ""))
-            summary = clean(entry.get("summary", ""))
-            link    = (entry.get("link") or "").strip()
-            pub_dt  = parse_date_safe(entry.get("published") or entry.get("updated") or "")
+            raw_title = clean(entry.get("title", ""))
+            summary   = clean(entry.get("summary", ""))
+            raw_link  = (entry.get("link") or "").strip()
+            link      = canonicalize_link(raw_link)
+            pub_dt    = parse_date_safe(entry.get("published") or entry.get("updated") or "")
 
             # server-side age filter
             age_days = (datetime.now(timezone.utc) - pub_dt).total_seconds() / 86400.0
@@ -198,19 +212,20 @@ def fetch_all_articles(max_age_days: int = 30):
             if dom in DOMAIN_BLOCKLIST:
                 continue
 
-            full_text = f"{title} {summary}"
+            full_text = f"{raw_title} {summary}"
             topics = matched_topics_for(full_text)
             if not topics:
                 continue  # keep only items that match at least one topic
 
-            aid = article_id(title, link)
+            aid = article_id(raw_title, link)
             if aid in seen_ids:
                 continue
             seen_ids.add(aid)
 
             items.append({
                 "id": aid,
-                "title": title,
+                "title": raw_title,
+                "norm_title": normalize_title(raw_title),
                 "summary": summary,
                 "link": link,
                 "date": pub_dt.isoformat(),
@@ -219,8 +234,89 @@ def fetch_all_articles(max_age_days: int = 30):
                 "image": extract_image(entry) or "",
                 "domain": dom,
                 "source_weight": DOMAIN_WEIGHTS.get(dom, 1.0),
+                "is_aggregator": dom in AGGREGATORS,
             })
-    return items
+
+    # Deduplicate similar stories appearing via aggregators / alt links
+    return deduplicate_articles(items)
+
+def deduplicate_articles(items: list) -> list:
+    """
+    Keep one representative per story cluster.
+    Prefers non-aggregators, higher-weighted sources, then newer items.
+    """
+    if not items:
+        return items
+
+    # Sort best-first for selection
+    items_sorted = sorted(
+        items,
+        key=lambda x: (
+            x["date_dt"],
+            x.get("source_weight", 1.0),
+            0 if not x.get("is_aggregator") else -1  # non-aggregator > aggregator
+        ),
+        reverse=True
+    )
+
+    kept = []
+    for art in items_sorted:
+        duplicate = False
+
+        # URL equality (ignoring params already normalized)
+        for k in kept:
+            if art["link"] == k["link"]:
+                duplicate = True
+                break
+
+        if duplicate:
+            continue
+
+        # Same domain + similar path and very similar title
+        for k in kept:
+            if art["domain"] == k["domain"]:
+                # strong title match threshold
+                if fuzz.token_set_ratio(art["norm_title"], k["norm_title"]) >= 92:
+                    duplicate = True
+                    break
+
+        if duplicate:
+            continue
+
+        # Cross-domain fuzzy title dedupe (aggregators vs originals)
+        for k in kept:
+            if art["is_aggregator"] or k["is_aggregator"]:
+                if fuzz.token_set_ratio(art["norm_title"], k["norm_title"]) >= 94:
+                    duplicate = True
+                    break
+
+        if not duplicate:
+            kept.append(art)
+
+    # Re-sort for display (newest first; tie-breaker by source weight)
+    kept = sorted(kept, key=lambda x: (x["date_dt"], x.get("source_weight", 1.0)), reverse=True)
+    return kept
+
+# =========================
+# Image extraction
+# =========================
+def extract_image(entry):
+    media = entry.get("media_content", [])
+    if isinstance(media, list) and media and media[0].get("url"):
+        return media[0]["url"]
+    thumbs = entry.get("media_thumbnail", [])
+    if isinstance(thumbs, list) and thumbs and thumbs[0].get("url"):
+        return thumbs[0]["url"]
+    if entry.get("summary"):
+        img = BeautifulSoup(entry["summary"], "html.parser").find("img")
+        if img and img.get("src"):
+            return img["src"]
+    if entry.get("content"):
+        html = entry["content"][0].get("value", "")
+        img = BeautifulSoup(html, "html.parser").find("img")
+        if img and img.get("src"):
+            return img["src"]
+    return ""
 
 # =========================
 # Numbered pagination (single, horizontal)
@@ -228,7 +324,6 @@ def fetch_all_articles(max_age_days: int = 30):
 def render_pagination(total_pages: int, state_key: str = "page", window: int = 2, key_prefix: str = "top_"):
     """
     Horizontal pager: ‹ Prev 1 … 4 5 6 … N Next ›
-    Renders in one row using columns.
     """
     current = st.session_state.get(state_key, 1)
     current = max(1, min(current, total_pages))
@@ -237,7 +332,6 @@ def render_pagination(total_pages: int, state_key: str = "page", window: int = 2
     def set_page(n: int):
         st.session_state[state_key] = max(1, min(n, total_pages))
 
-    # numbers to show
     pages = [1]
     start = max(2, current - window)
     end   = min(total_pages - 1, current + window)
@@ -249,15 +343,12 @@ def render_pagination(total_pages: int, state_key: str = "page", window: int = 2
     if total_pages > 1:
         pages.append(total_pages)
 
-    # columns: Prev + numbers/dots + Next
     slots = 2 + len(pages)
     cols = st.columns(slots)
 
-    # Prev
     if cols[0].button("‹ Prev", key=f"{key_prefix}{state_key}_prev", disabled=(current == 1)):
         set_page(current - 1)
 
-    # Numbers/dots
     idx = 1
     for p in pages:
         if isinstance(p, str) and p.startswith("dots"):
@@ -270,7 +361,6 @@ def render_pagination(total_pages: int, state_key: str = "page", window: int = 2
                     set_page(p)
         idx += 1
 
-    # Next
     if cols[-1].button("Next ›", key=f"{key_prefix}{state_key}_next", disabled=(current == total_pages)):
         set_page(current + 1)
 
@@ -323,7 +413,6 @@ def passes_filters(a: dict) -> bool:
 
 def apply_sort(items: list[dict]) -> list[dict]:
     if sort_by == "Newest first":
-        # Recent first; if same time, prefer higher-weighted sources
         return sorted(items, key=lambda x: (x["date_dt"], x.get("source_weight", 1.0)), reverse=True)
     if sort_by == "Oldest first":
         return sorted(items, key=lambda x: (x["date_dt"], -x.get("source_weight", 1.0)))
@@ -341,10 +430,8 @@ total_pages = max(1, math.ceil(len(filtered) / PAGE_SIZE))
 if "page" not in st.session_state:
     st.session_state["page"] = 1
 
-# Single horizontal pager at the top
 current_page = render_pagination(total_pages, state_key="page", window=2, key_prefix="top_")
 
-# Slice for current page
 start = (current_page - 1) * PAGE_SIZE
 end = start + PAGE_SIZE
 page_articles = filtered[start:end]
