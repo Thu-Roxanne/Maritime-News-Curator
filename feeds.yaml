@@ -12,8 +12,6 @@ feeds:
   # extra port/terminal-focused sources
   - https://container-news.com/feed/
   - https://www.dredgingtoday.com/feed/
-  - https://www.kalmarglobal.com/newsroom/news-rss/
-  - https://www.konecranes.com/news-and-press-releases/rss
 
 google_news_queries:
   # Decarbonization / regulation
@@ -49,4 +47,5 @@ domain_blocklist:
   - presscontact.co
   - yahoo.com
   - medium.com
+
 
