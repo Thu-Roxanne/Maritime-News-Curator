@@ -9,7 +9,9 @@ feeds:
   - https://www.imo.org/en/MediaCentre/PressBriefings/Pages/All-articles.aspx?rss=1
   - https://gcaptain.com/feed/
   - https://theloadstar.com/feed/
-  
+  - https://container-news.com/feed/
+  - https://www.dredgingtoday.com/feed/
+
 google_news_queries:
   # Decarbonization / regulation
   - "\"FuelEU Maritime\" OR EU ETS shipping OR \"shore power\" OR \"cold ironing\" when:14d"
@@ -33,20 +35,16 @@ google_news_queries:
   - "seafarer welfare OR MLC 2006 OR \"crew change\" OR fatigue when:30d"
   - "SOLAS OR ISM Code OR \"Port State Control\" OR \"Paris MoU\" when:30d"
 
-domain_blocklist:  # optional quality filter for Google News
+  # NEW: Ports & Port Technology
+  - "\"terminal operating system\" OR TOS OR \"Navis N4\" OR Tideworks OR CyberLogitec when:30d"
+  - "\"quay crane\" OR \"STS crane\" OR RTG OR RMG OR ASC OR \"straddle carrier\" when:30d"
+  - "\"gate automation\" OR OCR OR \"truck appointment system\" OR TAS when:30d"
+  - "\"port call optimization\" OR \"just-in-time arrival\" OR JIT arrival when:30d"
+  - "dredging OR \"berth expansion\" OR \"terminal concession\" OR \"port expansion\" when:30d"
+  - "\"LNG bunkering\" OR \"methanol bunkering\" OR \"ammonia bunkering\" when:30d"
+
+domain_blocklist:
   - feedspot.com
   - presscontact.co
   - yahoo.com
   - medium.com
-
-domain_weights:  # optional credibility bump (1.0 default)
-  gcaptain.com: 1.3
-  theloadstar.com: 1.25
-  joc.com: 1.35
-  seatrade-maritime.com: 1.2
-  porttechnology.org: 1.15
-  hellenicshippingnews.com: 1.1
-  maritime-executive.com: 1.2
-  marinelink.com: 1.15
-  imo.org: 1.4
-  cma-cgm.com: 1.0
