@@ -26,13 +26,13 @@ topics:
       "Red Sea", "Bab el-Mandeb", "Houthi",
       "Suez", "Panama Canal", "Strait of Hormuz",
       "South China Sea", "Taiwan", "Ukraine", "Black Sea",
-      "sanctions", "OFAC", "price cap", "ST*S transfer", "dark fleet",
+      "sanctions", "OFAC", "price cap", "STS transfer", "dark fleet",
       "piracy", "Gulf of Guinea", "Somalia"
     ]
 
   Logistics and Supply Chain Management:
       include: [
-      "freight rates", "spot rates", "SCFI", "FBX", "WCI", "shipment", "delay"
+      "freight rates", "spot rates", "SCFI", "FBX", "WCI", "shipment", "delay",
       "blank sailings", "port congestion", "detention and demurrage",
       "GRI", "intermodal", "rail congestion", "inventory", "freight", "logistics", 
       "berth productivity", "throughput", "TEU", "transport", "containers", "supply chain"
@@ -45,4 +45,5 @@ topics:
       "women in shipping", "unions", "strike", "IMO conventions", 
       "human error", "fatigue",  "STCW", "MLC 2006", "training"
     ]
+
 
