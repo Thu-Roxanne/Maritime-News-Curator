@@ -9,8 +9,11 @@ feeds:
   - https://www.imo.org/en/MediaCentre/PressBriefings/Pages/All-articles.aspx?rss=1
   - https://gcaptain.com/feed/
   - https://theloadstar.com/feed/
+  # extra port/terminal-focused sources
   - https://container-news.com/feed/
   - https://www.dredgingtoday.com/feed/
+  - https://www.kalmarglobal.com/newsroom/news-rss/
+  - https://www.konecranes.com/news-and-press-releases/rss
 
 google_news_queries:
   # Decarbonization / regulation
@@ -35,7 +38,7 @@ google_news_queries:
   - "seafarer welfare OR MLC 2006 OR \"crew change\" OR fatigue when:30d"
   - "SOLAS OR ISM Code OR \"Port State Control\" OR \"Paris MoU\" when:30d"
 
-  # NEW: Ports & Port Technology
+  # Ports & Port Technology
   - "\"terminal operating system\" OR TOS OR \"Navis N4\" OR Tideworks OR CyberLogitec when:30d"
   - "\"quay crane\" OR \"STS crane\" OR RTG OR RMG OR ASC OR \"straddle carrier\" when:30d"
   - "\"gate automation\" OR OCR OR \"truck appointment system\" OR TAS when:30d"
