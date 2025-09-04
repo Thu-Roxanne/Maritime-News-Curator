@@ -3,8 +3,12 @@ feedparser==6.0.11
 pyyaml==6.0.2
 beautifulsoup4==4.12.3
 requests==2.32.3
-lxml==5.2.2
+
+# helpers (pure-Python wheels only)
 python-dateutil==2.9.0.post0
 rapidfuzz==3.9.7
 tldextract==5.1.2
 langdetect==1.0.9
+
+# prevent Streamlit conflict (must be <14)
+rich==13.9.4
