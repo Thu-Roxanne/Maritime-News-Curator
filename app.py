@@ -11,42 +11,84 @@ from urllib.parse import urlparse
 
 st.set_page_config(page_title="Maritime Latest News", layout="wide")
 
-# ---------------- CSS (cards + small polish) ----------------
+# =========================
+# CSS – modern card layout
+# =========================
 st.markdown("""
 <style>
 :root { --card-radius:14px; --card-shadow:0 4px 20px rgba(0,0,0,.06); }
-.block-container { padding-top: 1.5rem; }
-.stButton>button { border-radius: 999px !important; padding: .4rem .9rem; border: 1px solid rgba(0,0,0,.08); }
+.block-container { padding-top: 1.2rem; }
+
+/* Sidebar polish */
+.css-1d391kg, .css-1d391kg div[role="radiogroup"] { gap: .5rem; }
 
 /* Cards */
-.news-card { background:#fff; border-radius:var(--card-radius); box-shadow:var(--card-shadow);
-  padding:16px 16px 12px 16px; border:1px solid rgba(0,0,0,.06); min-height:100%; }
+.news-card {
+  background: #fff;
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+  padding: 16px 16px 12px 16px;
+  border: 1px solid rgba(0,0,0,.06);
+  min-height: 100%;
+}
 .news-card:hover { transform: translateY(-1px); }
-.news-title { font-size:1.15rem; font-weight:700; line-height:1.25; margin:6px 0 6px 0; }
-.news-meta { color:#6b7280; font-size:0.9rem; margin-bottom:6px; }
-.news-summary { color:#374151; font-size:.95rem; }
-.news-thumb img { border-radius:10px; }
-.badge { display:inline-block; padding:2px 8px; background:#f1f5f9; border-radius:999px;
-  font-size:.8rem; color:#0f172a; border:1px solid #e2e8f0; }
+.news-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 6px 0 6px 0;
+}
+.news-meta {
+  color: #6b7280;
+  font-size: 0.9rem;
+  margin-bottom: 6px;
+}
+.news-summary {
+  color: #374151;
+  font-size: .95rem;
+}
+.news-thumb img { border-radius: 10px; }
+.badge {
+  display:inline-block;
+  padding: 2px 8px;
+  background: #f1f5f9;
+  border-radius: 999px;
+  font-size: .8rem;
+  color: #0f172a;
+  border: 1px solid #e2e8f0;
+}
 hr.soft { border:0; border-top:1px solid rgba(0,0,0,.06); margin:18px 0; }
+
+/* Numbered pager */
+.pager { display:flex; align-items:center; gap:.35rem; flex-wrap:wrap; margin:.25rem 0 1rem 0; }
+.pager .btn { padding:.32rem .6rem; border:1px solid rgba(0,0,0,.12); border-radius:10px; background:#fff; }
+.pager .btn:hover { background:#f8fafc; }
+.pager .btn.active { background:#111827; color:#fff; border-color:#111827; }
+.pager .dots { padding:0 .3rem; color:#9CA3AF; }
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------- YAML loaders ----------------
+# =========================
+# YAML loaders (safe)
+# =========================
 def load_yaml_safe(path: str, name: str):
     try:
         with open(path, "r", encoding="utf-8") as f:
             return yaml.safe_load(f) or {}
     except yaml.YAMLError as e:
-        st.error(f"❌ YAML error in {name}: {e}"); st.stop()
+        st.error(f"❌ YAML error in {name}: {e}")
+        st.stop()
     except FileNotFoundError:
-        st.error(f"❌ File not found: {name}"); st.stop()
+        st.error(f"❌ File not found: {name}")
+        st.stop()
 
 topic_config = load_yaml_safe("topics.yaml", "topics.yaml")
 feed_config  = load_yaml_safe("feeds.yaml", "feeds.yaml")
 ALL_TOPICS   = list(topic_config.get("topics", {}).keys())
 
-# ---------------- Utilities ----------------
+# =========================
+# Utilities
+# =========================
 def clean(text):
     s = str(text or "")
     if "<" in s and ">" in s:
@@ -57,7 +99,8 @@ def article_id(title, link):
     return hashlib.sha1(f"{title}{link}".encode()).hexdigest()
 
 def parse_date_safe(s: str) -> datetime:
-    if not s: return datetime.now(timezone.utc)
+    if not s:
+        return datetime.now(timezone.utc)
     try:
         dt = dparser.parse(s, fuzzy=True)
         return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
@@ -66,16 +109,20 @@ def parse_date_safe(s: str) -> datetime:
 
 def extract_image(entry):
     media = entry.get("media_content", [])
-    if isinstance(media, list) and media and media[0].get("url"): return media[0]["url"]
+    if isinstance(media, list) and media and media[0].get("url"):
+        return media[0]["url"]
     thumbs = entry.get("media_thumbnail", [])
-    if isinstance(thumbs, list) and thumbs and thumbs[0].get("url"): return thumbs[0]["url"]
+    if isinstance(thumbs, list) and thumbs and thumbs[0].get("url"):
+        return thumbs[0]["url"]
     if entry.get("summary"):
         img = BeautifulSoup(entry["summary"], "html.parser").find("img")
-        if img and img.get("src"): return img["src"]
+        if img and img.get("src"):
+            return img["src"]
     if entry.get("content"):
         html = entry["content"][0].get("value", "")
         img = BeautifulSoup(html, "html.parser").find("img")
-        if img and img.get("src"): return img["src"]
+        if img and img.get("src"):
+            return img["src"]
     return ""
 
 def get_domain(u: str) -> str:
@@ -84,7 +131,9 @@ def get_domain(u: str) -> str:
     except Exception:
         return ""
 
-# ---------------- Fetch once, classify all ----------------
+# =========================
+# Fetch & classify (cached)
+# =========================
 @st.cache_data(show_spinner=True, ttl=600)
 def fetch_all_articles(max_age_days: int = 30):
     feeds   = feed_config.get("feeds", [])
@@ -137,7 +186,63 @@ def fetch_all_articles(max_age_days: int = 30):
             })
     return items
 
-# ---------------- Sidebar filters ----------------
+# =========================
+# Numbered pagination helper
+# =========================
+def render_pagination(total_pages: int, state_key: str = "page", window: int = 2):
+    """
+    Classic 1 2 3 … pager with Prev/Next.
+    - total_pages: total number of pages (>=1)
+    - state_key: session_state key for the current page
+    - window: how many pages to show on each side of current page
+    """
+    current = st.session_state.get(state_key, 1)
+    current = max(1, min(current, total_pages))
+    st.session_state[state_key] = current
+
+    def set_page(n: int):
+        st.session_state[state_key] = max(1, min(n, total_pages))
+
+    # Determine which page numbers to show
+    pages = [1]
+    start = max(2, current - window)
+    end   = min(total_pages - 1, current + window)
+    if start > 2:
+        pages.append("dots-left")
+    pages.extend(range(start, end + 1))
+    if end < total_pages - 1:
+        pages.append("dots-right")
+    if total_pages > 1:
+        pages.append(total_pages)
+
+    # Render
+    st.markdown('<div class="pager">', unsafe_allow_html=True)
+
+    # Prev
+    if st.button("‹ Prev", key=f"{state_key}_prev", disabled=(current == 1), help="Previous page"):
+        set_page(current - 1)
+
+    # Numbers + dots
+    for p in pages:
+        if isinstance(p, str) and p.startswith("dots"):
+            st.markdown('<span class="dots">…</span>', unsafe_allow_html=True)
+        else:
+            if p == current:
+                st.markdown(f'<span class="btn active">{p}</span>', unsafe_allow_html=True)
+            else:
+                if st.button(str(p), key=f"{state_key}_{p}"):
+                    set_page(p)
+
+    # Next
+    if st.button("Next ›", key=f"{state_key}_next", disabled=(current == total_pages), help="Next page"):
+        set_page(current + 1)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+    return st.session_state[state_key]
+
+# =========================
+# UI – Sidebar filters
+# =========================
 st.title("📰 Maritime Latest News")
 
 with st.sidebar:
@@ -165,7 +270,9 @@ if refresh_clicked or "all_articles" not in st.session_state:
     st.session_state["all_articles"] = fetch_all_articles(max_age_days=max_age_days)
 articles = st.session_state["all_articles"]
 
-# ---------------- Filter + sort client-side ----------------
+# =========================
+# Filter + sort client-side
+# =========================
 def date_in_window(dt: datetime, start_d: date, end_d: date) -> bool:
     d = dt.date()
     return (d >= start_d) and (d <= end_d)
@@ -175,7 +282,7 @@ def passes_filters(a: dict) -> bool:
         if not any(t in choose_topics for t in a["topics"]):
             return False
     if start_date and end_date:
-        if not date_in_window(a["date_dt"], start_date, end_date):
+        if not date_in_window(a["date_dt"], start_date, end_d=end_date):
             return False
     return True
 
@@ -188,30 +295,21 @@ def apply_sort(items: list[dict]) -> list[dict]:
 
 filtered = apply_sort([a for a in articles if passes_filters(a)])
 
-# ---------------- Render ----------------
+# =========================
+# Render results + pagination
+# =========================
 st.markdown(f"## 📌 Results ({len(filtered)} articles)")
 
-# Pagination controls
 PAGE_SIZE = 18
 total_pages = max(1, math.ceil(len(filtered) / PAGE_SIZE))
 if "page" not in st.session_state:
     st.session_state["page"] = 1
-# pager row
-c1, c2, c3 = st.columns([1, 2, 1])
-with c1:
-    if st.button("⬅️ Previous", disabled=st.session_state["page"] <= 1):
-        st.session_state["page"] -= 1
-with c2:
-    st.session_state["page"] = st.selectbox(
-        "Page", options=list(range(1, total_pages + 1)),
-        index=min(st.session_state["page"] - 1, total_pages - 1),
-        label_visibility="collapsed"
-    )
-with c3:
-    if st.button("Next ➡️", disabled=st.session_state["page"] >= total_pages):
-        st.session_state["page"] += 1
 
-start = (st.session_state["page"] - 1) * PAGE_SIZE
+# Top pager
+current_page = render_pagination(total_pages, state_key="page", window=2)
+
+# Slice for current page
+start = (current_page - 1) * PAGE_SIZE
 end = start + PAGE_SIZE
 page_articles = filtered[start:end]
 
@@ -224,7 +322,10 @@ def display_card(article, key_suffix):
     st.markdown(f'<div class="news-title">{article["title"]}</div>', unsafe_allow_html=True)
     date_str = article["date"][:10]
     dom = article.get("domain", "")
-    st.markdown(f'<div class="news-meta">📅 {date_str} &nbsp;&nbsp;•&nbsp;&nbsp; 🔖 {dom}</div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="news-meta">📅 {date_str} &nbsp;&nbsp;•&nbsp;&nbsp; 🔖 {dom}</div>',
+        unsafe_allow_html=True
+    )
     chips = " ".join([f'<span class="badge">{t}</span>' for t in article["topics"][:3]])
     if chips:
         st.markdown(chips, unsafe_allow_html=True)
@@ -235,12 +336,16 @@ def display_card(article, key_suffix):
         selected.append(article)
     st.markdown("</div>", unsafe_allow_html=True)
 
+# Grid – 3 columns per row
 for i in range(0, len(page_articles), 3):
     cols = st.columns(3)
     for j in range(3):
         if i + j < len(page_articles):
             with cols[j]:
                 display_card(page_articles[i + j], key_suffix=f"{i}_{j}")
+
+# Bottom pager (optional, mirrors top)
+render_pagination(total_pages, state_key="page", window=2)
 
 st.divider()
 
