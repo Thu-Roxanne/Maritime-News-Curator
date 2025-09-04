@@ -59,6 +59,9 @@ topic_config = load_yaml_safe("topics.yaml", "topics.yaml")
 feed_config  = load_yaml_safe("feeds.yaml", "feeds.yaml")
 ALL_TOPICS   = list(topic_config.get("topics", {}).keys())
 
+DOMAIN_BLOCKLIST = set(feed_config.get("domain_blocklist", []) or [])
+DOMAIN_WEIGHTS   = {k.lower(): float(v) for k, v in (feed_config.get("domain_weights", {}) or {}).items()}
+
 # =========================
 # Utilities
 # =========================
@@ -81,16 +84,20 @@ def parse_date_safe(s: str) -> datetime:
         return datetime.now(timezone.utc)
 
 def extract_image(entry):
+    # media_content
     media = entry.get("media_content", [])
     if isinstance(media, list) and media and media[0].get("url"):
         return media[0]["url"]
+    # thumbnails
     thumbs = entry.get("media_thumbnail", [])
     if isinstance(thumbs, list) and thumbs and thumbs[0].get("url"):
         return thumbs[0]["url"]
+    # try summary HTML
     if entry.get("summary"):
         img = BeautifulSoup(entry["summary"], "html.parser").find("img")
         if img and img.get("src"):
             return img["src"]
+    # try content HTML
     if entry.get("content"):
         html = entry["content"][0].get("value", "")
         img = BeautifulSoup(html, "html.parser").find("img")
@@ -118,6 +125,8 @@ def fetch_all_articles(max_age_days: int = 30):
     urls = feeds + google_feeds
 
     items = []
+    seen_ids = set()
+
     for url in urls:
         try:
             d = feedparser.parse(url)
@@ -137,6 +146,10 @@ def fetch_all_articles(max_age_days: int = 30):
             if age_days > max_age_days:
                 continue
 
+            dom = get_domain(link)
+            if dom in DOMAIN_BLOCKLIST:
+                continue
+
             full_text = f"{title} {summary}"
             matched_topics = []
             for topic, data in topic_config.get("topics", {}).items():
@@ -147,8 +160,13 @@ def fetch_all_articles(max_age_days: int = 30):
             if not matched_topics:
                 continue  # only keep items that match at least one topic
 
+            aid = article_id(title, link)
+            if aid in seen_ids:
+                continue
+            seen_ids.add(aid)
+
             items.append({
-                "id": article_id(title, link),
+                "id": aid,
                 "title": title,
                 "summary": summary,
                 "link": link,
@@ -156,7 +174,8 @@ def fetch_all_articles(max_age_days: int = 30):
                 "date_dt": pub_dt,
                 "topics": matched_topics,
                 "image": extract_image(entry) or "",
-                "domain": get_domain(link),
+                "domain": dom,
+                "source_weight": DOMAIN_WEIGHTS.get(dom, 1.0),
             })
     return items
 
@@ -260,9 +279,10 @@ def passes_filters(a: dict) -> bool:
 
 def apply_sort(items: list[dict]) -> list[dict]:
     if sort_by == "Newest first":
-        return sorted(items, key=lambda x: x["date_dt"], reverse=True)
+        # Recent first; if same day, prefer higher-weighted sources
+        return sorted(items, key=lambda x: (x["date_dt"], x.get("source_weight", 1.0)), reverse=True)
     if sort_by == "Oldest first":
-        return sorted(items, key=lambda x: x["date_dt"])
+        return sorted(items, key=lambda x: (x["date_dt"], -x.get("source_weight", 1.0)))
     return sorted(items, key=lambda x: x["title"].lower())
 
 filtered = apply_sort([a for a in articles if passes_filters(a)])
